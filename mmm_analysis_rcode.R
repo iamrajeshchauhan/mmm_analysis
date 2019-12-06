@@ -1,0 +1,127 @@
+install.packages("linprog")
+library("linprog")
+library(dplyr)
+library(DataCombine)
+library(reshape)
+install.packages("readxl")
+library(readxl)
+library(data.table)
+
+data<-read.csv("case_study.csv")
+summary(data)
+
+data1<- data[!(is.na(data$Sku.Size) | data$Sku.Size==""), ]
+data2<- data1[!(is.na(data1$Channel.Name) | data1$Channel.Name==""), ]
+data3<- data2[!(is.na(data2$Sku.Size) | data2$Sku.Size==""), ]
+
+sku_list<- unique(data3$Sku.Size)
+
+lower_case<- tolower(sku_list)
+
+
+Replaces <- data.frame(from = c("100 ML FT", "200 ML FT","500 ML FT",
+                                "1 LTR PJ","500 ML EJ","200 ML EJ",
+                                "600 ML FT" ,"25 ML FT" , "50 ML FT",
+                                "100 ML EJ" ,"250 ML FT","250 ML EJ" ,
+                                "175 ML FT" , "175 ML EJ" , "38 ML FT" , 
+                                "32 ML FT" , "30 ML FT", "48 ML FT"  ,
+                                "2 LTR PJ", "300 ML EJ", "300 ML FT" ,
+                                "600 ML EJ" , "550 ML FT" , "550 ML EJ", 
+                                "45 ML FT"  , "40 ML FT" , "175 ML OTC",
+                                "250 ML BOT", "175 ML RTL" ,"200 ML RTL"), to = c("England", "Germany"))
+
+
+Replaces <- data.frame(from = c("100 ML FT", "200 ML FT","500 ML FT",
+                                "1 LTR PJ","500 ML EJ","200 ML EJ",
+                                "600 ML FT" ,"25 ML FT" , "50 ML FT",
+                                "100 ML EJ" ,"250 ML FT","250 ML EJ" ,
+                                "175 ML FT" , "175 ML EJ" , "38 ML FT" , 
+                                "32 ML FT" , "30 ML FT", "48 ML FT"  ,
+                                "2 LTR PJ", "300 ML EJ", "300 ML FT" ,
+                                "600 ML EJ" , "550 ML FT" , "550 ML EJ", 
+                                "45 ML FT"  , "40 ML FT" , "175 ML OTC",
+                                "250 ML BOT", "175 ML RTL" ,"200 ML RTL"),
+                       to =c("100ml","200ml","500ml",
+                             "1ltr","500ml","200ml",
+                             "600ml" ,"25ml" , "50ml",
+                             "100ml" ,"250ml","250ml" ,
+                             "175ml" , "175ml" , "38ml" , 
+                             "32ml" , "30ml", "48ml"  ,
+                             "2ltr", "300ml", "300ml" ,
+                             "600ml" , "550ml" , "550ml", 
+                             "45ml"  , "40ml" , "175ml",
+                             "250ml", "175ml" ,"200ml"
+                       ))
+
+# Replace patterns and return full data frame
+ABNewDF <- FindReplace(data = data3, Var = "Sku.Size", replaceData = Replaces,
+                       from = "from", to = "to", exact = FALSE)
+
+View(ABNewDF)
+
+abnewdf1<- sqldf('select Type,"Channel.Name",State,"Sku.Size",
+                        sum("Apr.16") as apr2016,sum("May.16") as may2016,
+                        sum("Jun.16") as jun2016,
+                        sum("Jul.16") as jul2016,
+                        sum("Aug.16") as aug2016,
+                        sum("Sep.16") as sep2016,
+                        sum("Oct.16") as oct2016,
+                        sum("Nov.16") as nov2016,
+                        sum("Dec.16") as dec2016,
+                        sum("Jan.17") as jan2017,
+                        sum("Feb.17") as feb2017,
+                        sum("Mar.17") as mar2017,
+                        sum("Apr.17") as apr2017,
+                        sum("May.17") as may2017,
+                        sum("Jun.17") as jun2017,
+                        sum("Jul.17") as jul2017,
+                        sum("Aug.17") as aug2017,
+                        sum("Sep.17") as sep2017,
+                        sum("Oct.17") as oct2017,
+                        sum("Nov.17") as nov2017,
+                        sum("Dec.17") as dec2017,
+                        sum("Jan.18") as jab2018,
+                        sum("Feb.18") as feb2018,
+                        sum("Mar.18") as mar2018,
+                        sum("Apr.18") as apr2018,
+                        sum("May.18") as may2018,
+                        sum("Jun.18") as jun2018,
+                        sum("Jul.18") as jul2018,
+                        sum("Aug.18") as aug2018,
+                        sum("Sep.18") as sep2018,
+                        sum("Oct.18") as oct2018,
+                        sum("Nov.18") as nov2018,
+                        sum("Dec.18") as dec2018,
+                        sum("Jan.19") as jan2019,
+                        sum("Feb.19") as feb2019,
+                        sum("Mar.19") as mar2019
+
+                        from ABNewDF
+                        group by Type,"Channel.Name",State,"Sku.Size" ')
+
+View(abnewdf1)
+
+md <- melt(abnewdf1, id=(c("Type","Channel.Name","State","Sku.Size")))
+colnames(md)
+name<- c("Type","Channel.Name","State","Sku.Size","Date","Sum")
+setnames(md, name)
+colnames(md)
+
+View(md)
+
+total_mrp<- md %>% 
+  select(Type,Channel.Name,State,Sku.Size,Date,Sum) %>%
+  filter(Type == "Total MRP")
+
+View(total_mrp)
+total_mrp$Sum <- total_mrp$Sum*1000
+
+sales<- md %>% 
+  select(Type,Channel.Name,State,Sku.Size,Date,Sum) %>%
+  filter(Type == "Sales Volume (KL)")
+
+INR_LT<- total_mrp$Sum/sales$Sum
+
+Final_data<- cbind(total_mrp,INR_LT)
+keep<- c("Channel.Name","State","Sku.Size","Date","INR_LT")
+Final_data1<-Final_data[keep]
