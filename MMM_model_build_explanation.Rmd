@@ -1,3 +1,12 @@
+---
+title: "MMM_ model explanation"
+author: "Rajesh Chauhan"
+date: "08/12/2019"
+output: html_document
+---
+
+Run library and packages
+```{R}
 install.packages("linprog")
 library("linprog")
 library(dplyr)
@@ -6,30 +15,32 @@ library(reshape)
 install.packages("readxl")
 library(readxl)
 library(data.table)
+```
+
+Load the raw data 
+```{R}
 
 data<-read.csv("case_study.csv")
 summary(data)
+```
 
+Remove null values 
+```{R}
 data1<- data[!(is.na(data$Sku.Size) | data$Sku.Size==""), ]
 data2<- data1[!(is.na(data1$Channel.Name) | data1$Channel.Name==""), ]
 data3<- data2[!(is.na(data2$Sku.Size) | data2$Sku.Size==""), ]
+```
 
+Find uniqu sku to treat on normalization 
+```{R}
 sku_list<- unique(data3$Sku.Size)
 
 lower_case<- tolower(sku_list)
+```
 
+Create the list of sku to replace with identical names
 
-Replaces <- data.frame(from = c("100 ML FT", "200 ML FT","500 ML FT",
-                                "1 LTR PJ","500 ML EJ","200 ML EJ",
-                                "600 ML FT" ,"25 ML FT" , "50 ML FT",
-                                "100 ML EJ" ,"250 ML FT","250 ML EJ" ,
-                                "175 ML FT" , "175 ML EJ" , "38 ML FT" , 
-                                "32 ML FT" , "30 ML FT", "48 ML FT"  ,
-                                "2 LTR PJ", "300 ML EJ", "300 ML FT" ,
-                                "600 ML EJ" , "550 ML FT" , "550 ML EJ", 
-                                "45 ML FT"  , "40 ML FT" , "175 ML OTC",
-                                "250 ML BOT", "175 ML RTL" ,"200 ML RTL"), to = c("England", "Germany"))
-
+```{R}
 
 Replaces <- data.frame(from = c("100 ML FT", "200 ML FT","500 ML FT",
                                 "1 LTR PJ","500 ML EJ","200 ML EJ",
@@ -52,13 +63,21 @@ Replaces <- data.frame(from = c("100 ML FT", "200 ML FT","500 ML FT",
                              "45ml"  , "40ml" , "175ml",
                              "250ml", "175ml" ,"200ml"
                        ))
+```
 
 # Replace patterns and return full data frame
+```{R}
 ABNewDF <- FindReplace(data = data3, Var = "Sku.Size", replaceData = Replaces,
                        from = "from", to = "to", exact = FALSE)
 
+```
+
+
 View(ABNewDF)
 
+Run the SQL query to format the dataframe and finding the insights per months
+
+```{R}
 abnewdf1<- sqldf('select Type,"Channel.Name",State,"Sku.Size",
                         sum("Apr.16") as apr2016,sum("May.16") as may2016,
                         sum("Jun.16") as jun2016,sum("Jul.16") as jul2016,
@@ -82,29 +101,54 @@ abnewdf1<- sqldf('select Type,"Channel.Name",State,"Sku.Size",
                         from ABNewDF
                         group by Type,"Channel.Name",State,"Sku.Size" ')
 
+```
+
 View(abnewdf1)
+
+Transform the data using melt and create the approprate schema 
+
+```{R}
 
 md <- melt(abnewdf1, id=(c("Type","Channel.Name","State","Sku.Size")))
 colnames(md)
 name<- c("Type","Channel.Name","State","Sku.Size","Date","Sum")
 setnames(md, name)
 colnames(md)
+```
 
 View(md)
 
+Filter the data for the MRP value evaluation 
+```{R}
 total_mrp<- md %>% 
   select(Type,Channel.Name,State,Sku.Size,Date,Sum) %>%
   filter(Type == "Total MRP")
 
+```
+
+Create a formula to find the INR_LT
+```{R}
 View(total_mrp)
 total_mrp$Sum <- total_mrp$Sum*1000
+```
 
+
+Seperate the Sales volumes for the calculation 
+```{R}
 sales<- md %>% 
   select(Type,Channel.Name,State,Sku.Size,Date,Sum) %>%
   filter(Type == "Sales Volume (KL)")
+
+```
+
+Run the calculation and create the final date frame for each SKU, State and Channel name 
+
+```{R}
 
 INR_LT<- total_mrp$Sum/sales$Sum
 
 Final_data<- cbind(total_mrp,INR_LT)
 keep<- c("Channel.Name","State","Sku.Size","Date","INR_LT")
 Final_data1<-Final_data[keep]
+```
+
