@@ -11,6 +11,7 @@ View(raw_data)
 
 #clean the data
 
+
 summary(raw_data)
 raw<- subset( raw_data, select = -c(Sales, FB, Google.Search, 
                                     Video.Display.1,Net.Sales) ) 
