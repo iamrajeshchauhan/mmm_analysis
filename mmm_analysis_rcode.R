@@ -1,3 +1,5 @@
+
+
 install.packages("linprog")
 library("linprog")
 library(dplyr)
@@ -6,6 +8,8 @@ library(reshape)
 install.packages("readxl")
 library(readxl)
 library(data.table)
+
+
 
 data<-read.csv("case_study.csv")
 summary(data)
