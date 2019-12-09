@@ -1,3 +1,5 @@
+#import the library
+
 library(tidyverse)
 library(ggplot2)
 library(scales)
@@ -10,7 +12,6 @@ raw_data<-read.csv("algo_case.csv",skip = 1)
 View(raw_data)
 
 #clean the data
-
 
 summary(raw_data)
 raw<- subset( raw_data, select = -c(Sales, FB, Google.Search, 
